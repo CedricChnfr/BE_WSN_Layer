@@ -28,26 +28,36 @@ def test_sensor_read_data_co2():
 
 def test_frame_init():
     frame = Frame(1, 25, 30, 500)
-    assert frame.preamble == 0xAA
+    assert frame.sfd == 0xA5
     assert frame.car_id == 1
     assert frame.temperature == 25
     assert frame.people_count == 30
     assert frame.co2 == 500
-    assert frame.checksum == frame.calculate_checksum()
-    print(f"Frame initialized: Preamble={frame.preamble}, Car ID={frame.car_id}, Temperature={frame.temperature}, People Count={frame.people_count}, CO2={frame.co2}, Checksum={frame.checksum}")
+    assert frame.crc == frame.calculate_crc()
+    assert frame.efd == 0x5A
+    print(f"Frame initialized: SFD={frame.sfd}, Car ID={frame.car_id}, Temperature={frame.temperature}, People Count={frame.people_count}, CO2={frame.co2}, CRC={frame.crc}, EFD={frame.efd}")
 
-def test_frame_calculate_checksum():
+def test_frame_calculate_crc():
     frame = Frame(1, 25, 30, 500)
-    checksum = frame.calculate_checksum()
-    assert checksum == sum(struct.pack('B', frame.preamble) + struct.pack('B', frame.car_id) + struct.pack('h', frame.temperature) + struct.pack('B', frame.people_count) + struct.pack('H', frame.co2)) % 256
-    print(f"Calculated checksum: {checksum}")
+    crc = frame.calculate_crc()
+    assert crc == sum(struct.pack('B', frame.sfd) + struct.pack('B', frame.car_id) + struct.pack('h', frame.temperature) + struct.pack('B', frame.people_count) + struct.pack('H', frame.co2)) % 256
+    print(f"Calculated CRC: {crc}")
 
 def test_frame_to_bytes():
     frame = Frame(1, 25, 30, 500)
     frame_bytes = frame.to_bytes()
-    expected_bytes = struct.pack('B', frame.preamble) + struct.pack('B', frame.car_id) + struct.pack('h', frame.temperature) + struct.pack('B', frame.people_count) + struct.pack('H', frame.co2) + struct.pack('B', frame.checksum)
+    expected_bytes = struct.pack('B', frame.sfd) + struct.pack('B', frame.car_id) + struct.pack('h', frame.temperature) + struct.pack('B', frame.people_count) + struct.pack('H', frame.co2) + struct.pack('B', frame.crc) + struct.pack('B', frame.efd)
     assert frame_bytes == expected_bytes
     print(f"Frame to bytes: {frame_bytes}")
+    
+    # Vérification des valeurs des capteurs dans la trame convertie en octets
+    assert frame_bytes[0] == 0xA5  # SFD
+    assert frame_bytes[1] == 1  # Car ID
+    assert frame_bytes[2:4] == struct.pack('h', 25)  # Temperature
+    assert frame_bytes[4] == 30  # People Count
+    assert frame_bytes[5:7] == struct.pack('H', 500)  # CO2
+    assert frame_bytes[7] == frame.crc  # CRC
+    assert frame_bytes[8] == 0x5A  # EFD
 
 def test_tdmac_init():
     tdma_mac = TDMAMAC(300)

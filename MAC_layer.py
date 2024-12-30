@@ -20,19 +20,20 @@ class Sensor:
 
 class Frame:
     def __init__(self, car_id, temperature, people_count, co2):
-        self.preamble = 0xAA
+        self.sfd = 0xA5  # Start Frame Delimiter
         self.car_id = car_id
         self.temperature = temperature
         self.people_count = people_count
         self.co2 = co2
-        self.checksum = self.calculate_checksum()
+        self.crc = self.calculate_crc()
+        self.efd = 0x5A  # End Frame Delimiter
 
-    def calculate_checksum(self):
-        frame_data = struct.pack('B', self.preamble) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2)
+    def calculate_crc(self):
+        frame_data = struct.pack('B', self.sfd) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2)
         return sum(frame_data) % 256
 
     def to_bytes(self):
-        return struct.pack('B', self.preamble) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2) + struct.pack('B', self.checksum)
+        return struct.pack('B', self.sfd) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2) + struct.pack('B', self.crc) + struct.pack('B', self.efd)
 
 class TDMAMAC:
     def __init__(self, slot_duration=300):
@@ -45,12 +46,11 @@ class TDMAMAC:
 
     def start(self):
         while True:
-            temperature = random.randint(-10, 40)
-            people_count = random.randint(0, 50)
-            co2 = random.randint(300, 2000)
-            frame = Frame(1, temperature, people_count, co2)
-            self.transmit(frame)
-            time.sleep(self.slot_duration / len(self.sensors))
+            for sensor in self.sensors:
+                data = sensor.read_data()
+                frame = Frame(1, sensor.sensor_id, data)
+                self.transmit(frame)
+                time.sleep(self.slot_duration / len(self.sensors))
 
     def transmit(self, frame):
         print(f"Transmitting frame: {frame.to_bytes()}")
