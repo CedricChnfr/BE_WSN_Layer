@@ -19,25 +19,20 @@ class Sensor:
             raise ValueError("Unknown sensor type")
 
 class Frame:
-    SENSOR_TYPES = {
-        'temperature': 1,
-        'people_count': 2,
-        'co2': 3
-    }
-
-    def __init__(self, sensor_id, sensor_type, data):
+    def __init__(self, car_id, temperature, people_count, co2):
         self.preamble = 0xAA
-        self.sensor_id = sensor_id
-        self.sensor_type = self.SENSOR_TYPES[sensor_type]
-        self.data = data
+        self.car_id = car_id
+        self.temperature = temperature
+        self.people_count = people_count
+        self.co2 = co2
         self.checksum = self.calculate_checksum()
 
     def calculate_checksum(self):
-        frame_data = struct.pack('B', self.preamble) + struct.pack('B', self.sensor_id) + struct.pack('B', self.sensor_type) + struct.pack('I', self.data)
+        frame_data = struct.pack('B', self.preamble) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2)
         return sum(frame_data) % 256
 
     def to_bytes(self):
-        return struct.pack('B', self.preamble) + struct.pack('B', self.sensor_id) + struct.pack('B', self.sensor_type) + struct.pack('I', self.data) + struct.pack('B', self.checksum)
+        return struct.pack('B', self.preamble) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2) + struct.pack('B', self.checksum)
 
 class TDMAMAC:
     def __init__(self, slot_duration=300):
@@ -50,11 +45,12 @@ class TDMAMAC:
 
     def start(self):
         while True:
-            for sensor in self.sensors:
-                data = sensor.read_data()
-                frame = Frame(sensor.sensor_id, sensor.sensor_type, data)
-                self.transmit(frame)
-                time.sleep(self.slot_duration / len(self.sensors))
+            temperature = random.randint(-10, 40)
+            people_count = random.randint(0, 50)
+            co2 = random.randint(300, 2000)
+            frame = Frame(1, temperature, people_count, co2)
+            self.transmit(frame)
+            time.sleep(self.slot_duration / len(self.sensors))
 
     def transmit(self, frame):
         print(f"Transmitting frame: {frame.to_bytes()}")
