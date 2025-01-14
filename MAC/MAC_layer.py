@@ -19,27 +19,37 @@ class Sensor:
             raise ValueError("Unknown sensor type")
 
 class Frame:
-    def __init__(self, car_id, temperature, people_count, co2):
-        self.sfd = 0xA5  
+    SENSOR_TYPE_MAP = {
+        'temperature': 1,
+        'people_count': 2,
+        'co2': 3
+    }
+
+    def __init__(self, frame_id, metro_id, car_id, sensor_type, data):
+        self.sfd = 0xA5  # Start Frame Delimiter
+        self.frame_id = frame_id
+        self.metro_id = metro_id
         self.car_id = car_id
-        self.temperature = temperature
-        self.people_count = people_count
-        self.co2 = co2
+        self.sensor_id = self.SENSOR_TYPE_MAP[sensor_type]
+        self.data = data
+        self.address = (self.car_id << 4) | self.sensor_id  # 4 bits for car_id + sensor_id
+        self.randomization = random.randint(0, 15)  # 4 bits for randomization
         self.crc = self.calculate_crc()
-        self.efd = 0x5A 
+        self.efd = 0x5A  # End Frame Delimiter
 
     def calculate_crc(self):
-        frame_data = struct.pack('B', self.sfd) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2)
+        frame_data = struct.pack('B', self.sfd) + struct.pack('B', self.frame_id) + struct.pack('B', (self.address & 0xF0) | (self.randomization & 0x0F)) + struct.pack('h', self.data)
         return sum(frame_data) % 256
 
     def to_bytes(self):
-        return struct.pack('B', self.sfd) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2) + struct.pack('B', self.crc) + struct.pack('B', self.efd)
+        return struct.pack('B', self.sfd) + struct.pack('B', self.frame_id) + struct.pack('B', (self.address & 0xF0) | (self.randomization & 0x0F)) + struct.pack('h', self.data) + struct.pack('B', self.crc) + struct.pack('B', self.efd)
 
 class TDMAMAC:
     def __init__(self, slot_duration=300):
         self.slot_duration = slot_duration
         self.sensors = []
         self.current_slot = 0
+        self.frame_id = 1
 
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
@@ -48,8 +58,9 @@ class TDMAMAC:
         while True:
             for sensor in self.sensors:
                 data = sensor.read_data()
-                frame = Frame(1, sensor.sensor_id, data)
+                frame = Frame(self.frame_id, 1, sensor.sensor_id, sensor.sensor_type, data)
                 self.transmit(frame)
+                self.frame_id = (self.frame_id % 100) + 1
                 time.sleep(self.slot_duration / len(self.sensors))
 
     def transmit(self, frame):
