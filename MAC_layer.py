@@ -20,13 +20,13 @@ class Sensor:
 
 class Frame:
     def __init__(self, car_id, temperature, people_count, co2):
-        self.sfd = 0xA5  # Start Frame Delimiter
+        self.sfd = 0xA5  
         self.car_id = car_id
         self.temperature = temperature
         self.people_count = people_count
         self.co2 = co2
         self.crc = self.calculate_crc()
-        self.efd = 0x5A  # End Frame Delimiter
+        self.efd = 0x5A 
 
     def calculate_crc(self):
         frame_data = struct.pack('B', self.sfd) + struct.pack('B', self.car_id) + struct.pack('h', self.temperature) + struct.pack('B', self.people_count) + struct.pack('H', self.co2)

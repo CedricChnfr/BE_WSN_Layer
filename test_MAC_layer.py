@@ -1,4 +1,3 @@
-import pytest
 import struct
 from MAC_layer import Sensor, Frame, TDMAMAC
 
@@ -8,7 +7,7 @@ def test_sensor_init():
     assert sensor.sensor_type == 'temperature'
     print(f"Sensor initialized: ID={sensor.sensor_id}, Type={sensor.sensor_type}")
 
-def test_sensor_read_data():
+def test_sensor_read_data_temperature():
     sensor = Sensor(1, 'temperature')
     data = sensor.read_data()
     assert -10 <= data <= 40
@@ -50,7 +49,6 @@ def test_frame_to_bytes():
     assert frame_bytes == expected_bytes
     print(f"Frame to bytes: {frame_bytes}")
     
-    # Vérification des valeurs des capteurs dans la trame convertie en octets
     assert frame_bytes[0] == 0xA5  # SFD
     assert frame_bytes[1] == 1  # Car ID
     assert frame_bytes[2:4] == struct.pack('h', 25)  # Temperature
@@ -67,4 +65,11 @@ def test_tdmac_init():
     print(f"TDMA MAC initialized: Slot Duration={tdma_mac.slot_duration}, Sensors={tdma_mac.sensors}, Current Slot={tdma_mac.current_slot}")
 
 if __name__ == '__main__':
-    pytest.main()
+    test_sensor_init()
+    test_sensor_read_data_temperature()
+    test_sensor_read_data_people_count()
+    test_sensor_read_data_co2()
+    test_frame_init()
+    test_frame_calculate_crc()
+    test_frame_to_bytes()
+    test_tdmac_init()
