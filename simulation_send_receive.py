@@ -46,3 +46,5 @@ print("Demodulation of the signal\n")
 #Get info from frame
 received_frame = TSFrame.create_frame_from_bytes(received_frame_bytes)
 print("Received frame:\n" + received_frame.to_string())
+if(received_frame.test_current_crc()):
+    print(f"Frame corrupted. Current crc: {str(received_frame.crc)}, expected: {str(received_frame.calculate_crc())}")

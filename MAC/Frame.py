@@ -9,7 +9,7 @@ class FlagType(Enum):
     DISCOVER = 2
 
 class Frame:
-    def __init__(self, flag: FlagType | int, dest_address: int, src_address: int, data: int):
+    def __init__(self, flag: FlagType | int, dest_address: int, src_address: int, data: int, crc: int=-1):
         self.sfd = 0xA5  # Start Frame Delimiter
         if flag.__class__ == FlagType:
             self.flag = flag.value  # Convert FlagType to integer
@@ -20,7 +20,10 @@ class Frame:
         self.dest_address = dest_address  # 10 bits
         self.src_address = src_address  # 10 bits
         self.data = data  # 24 bits
-        self.crc = self.calculate_crc()  # 8 bits
+        if crc == -1:
+            self.crc = self.calculate_crc()  # 8 bits
+        else:
+            self.crc = crc
 
     @classmethod
     def create_frame_from_bytes(cls, frame_as_bytes: bytes) -> "Frame":
@@ -40,9 +43,18 @@ class Frame:
         src_address = (first_half & 0x3FF)
         data= second_half >> 8
         crc = second_half & 0xFF
-        frame = cls(flag, dest_address, src_address, data)
+        frame = cls(flag, dest_address, src_address, data, crc)
         frame.crc = crc
         return frame
+
+    def test_current_crc(self) -> bool:
+        """
+        Calculate the CRC and compare it with the current value.
+        This function is useful after using create_frame_from_bytes.
+        Returns true if different, meaning the frame as been corrupted, false is similar.
+        """
+        return self.calculate_crc() != self.crc
+
 
     def calculate_crc(self) -> int:
         """
@@ -83,13 +95,13 @@ sfd: {self.sfd},
 flag: {self.flag},
 destination address: {self.dest_address},
 source address: {self.src_address},
-crc: {self.src_address},
+crc: {self.crc},
 data: {self.data},
 binary: {self.to_string_as_bits()}
 -----------"""
     
 class TSFrame(Frame):
-    def __init__(self, flag: FlagType | int, dest_address: int, src_address: int, nb_person: int, temperature: int, air_quality: int):
+    def __init__(self, flag: FlagType | int, dest_address: int, src_address: int, nb_person: int, temperature: int, air_quality: int, crc: int = -1):
         self.sfd = 0xA5  # Start Frame Delimiter
         if flag.__class__ == FlagType:
             self.flag = flag.value  # Convert FlagType to integer
@@ -103,14 +115,18 @@ class TSFrame(Frame):
         self.temperature = ctypes.c_int8(temperature).value 
         self.air_quality = air_quality
         self.data = ((nb_person & (0xFF)) << 16) | ((temperature & (0xFF)) << 8) | (air_quality & (0xFF))
-        self.crc = self.calculate_crc()  # 8 bits
+        if crc == -1:
+            self.crc = self.calculate_crc()  # 8 bits
+        else:
+            self.crc = crc
 
     @classmethod
     def cast_frame_to_tsframe(cls, frame: Frame) -> "TSFrame":
         nb_person = (frame.data >> 16) & 0xFF
         temperature = ctypes.c_int8((frame.data >> 8) & 0xFF).value  # Ensure temperature is signed
         air_quality = frame.data & 0xFF
-        return TSFrame(frame.flag, frame.dest_address, frame.src_address, nb_person, temperature, air_quality)
+        return TSFrame(frame.flag, frame.dest_address, frame.src_address, nb_person, temperature, air_quality, frame.crc)
+    
     @classmethod
     def create_frame_from_bytes(cls, frame_as_bytes: bytes) -> "TSFrame":
         """
@@ -127,7 +143,7 @@ sfd: {self.sfd},
 flag: {self.flag},
 destination address: {self.dest_address},
 source address: {self.src_address},
-crc: {self.src_address},
+crc: {self.crc},
 number of persons: {self.nb_person},
 temperature: {self.temperature},
 air quality: {self.air_quality},
